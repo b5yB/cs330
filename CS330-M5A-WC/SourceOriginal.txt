@@ -1,0 +1,448 @@
+#include <iostream>         
+#include <cstdlib>          
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "camera.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+using namespace std;
+
+#ifndef GLSL
+#define GLSL(Version, Source) "#version " #Version " core \n" #Source
+#endif
+
+namespace {
+	const char* const windowTitle = "CS330-M5A-WC";
+	const int windowWidth = 800;
+	const int windowHeight = 700;
+
+	struct GLMesh {
+		GLuint vao;
+		GLuint vbos;
+		GLuint nVertices;
+	};
+
+	GLFWwindow* gWindow = nullptr;
+	GLMesh gMesh;
+	GLuint gTextureId;
+	GLuint gProgramId;
+
+	Camera gCamera(glm::vec3(0.0f, 0.0f, 3.0f));
+	float gLastX = windowWidth / 2.0f;
+	float gLastY = windowHeight / 2.0f;
+	bool gFirstMouse = true;
+
+	float gDeltaTime = 0.0f;
+	float gLastFrame = 0.0f;
+}
+
+bool UInitialize(int, char*[], GLFWwindow** window);
+void UResizeWindow(GLFWwindow* window, int width, int height);
+void UProcessInput(GLFWwindow* window);
+
+void UCreateMesh(GLMesh &mesh);
+void UDestroyMesh(GLMesh &mesh);
+
+bool UCreateTexture(const char* filename, GLuint &textureId);
+void UDestroyTexture(GLuint textureId);
+
+void UMousePositionCallback(GLFWwindow* window, double xpos, double ypos);
+void UMouseScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+void UMouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+
+void URender();
+bool UCreateShaderProgram(const char* vtxShaderSource, const char* fragShaderSource, GLuint &programId);
+void UDestroyShaderProgram(GLuint programId);
+
+const GLchar * vertexShaderSource = GLSL(440,
+	layout(location = 0) in vec3 position;
+	layout(location = 2) in vec2 textureCoordinate;
+
+	out vec2 vertexTextureCoordinate;
+
+	uniform mat4 model;
+	uniform mat4 view;
+	uniform mat4 projection;
+
+	void main() {
+		gl_Position = projection * view * model * vec4(position, 1.0f);
+		vertexTextureCoordinate = textureCoordinate;
+	}
+);
+
+const GLchar * fragmentShaderSource = GLSL(440,
+	in vec2 vertexTextureCoordinate;
+	out vec4 fragmentColor;
+	uniform sampler2D uTexture;
+
+	void main() {
+		fragmentColor = texture(uTexture, vertexTextureCoordinate);
+	}
+);
+
+//TODO
+//Images are loaded with Y axis going down, but OpenGL's Y axis goes up, so let's flip it
+void flipImageVertically(unsigned char *image, int width, int height, int channels)
+{
+	for (int j = 0; j < height / 2; ++j)
+	{
+		int index1 = j * width * channels;
+		int index2 = (height - 1 - j) * width * channels;
+
+		for (int i = width * channels; i > 0; --i)
+		{
+			unsigned char tmp = image[index1];
+			image[index1] = image[index2];
+			image[index2] = tmp;
+			++index1;
+			++index2;
+		}
+	}
+}
+
+int main(int argc, char* argv[]) {
+	if (!UInitialize(argc, argv, &gWindow))
+		return EXIT_FAILURE;
+
+	UCreateMesh(gMesh);
+
+	if (!UCreateShaderProgram(vertexShaderSource, fragmentShaderSource, gProgramId))
+		return EXIT_FAILURE;
+
+	//TODO
+	// Load texture 
+	const char * texFilename = "../resources/textures/brick2.png";
+	if (!UCreateTexture(texFilename, gTextureId))
+	{
+		cout << "Failed to load texture " << texFilename << endl;
+		return EXIT_FAILURE;
+	}
+	// tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
+	glUseProgram(gProgramId);
+	// We set the texture as texture unit 0
+	glUniform1i(glGetUniformLocation(gProgramId, "uTexture"), 0);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+	while (!glfwWindowShouldClose(gWindow)) {
+		float currentFrame = glfwGetTime();
+		gDeltaTime = currentFrame - gLastFrame;
+		gLastFrame = currentFrame;
+
+		UProcessInput(gWindow);
+
+		URender();
+
+		glfwPollEvents();
+	}
+
+	UDestroyMesh(gMesh);
+	UDestroyTexture(gTextureId);
+	UDestroyShaderProgram(gProgramId);
+	exit(EXIT_SUCCESS);
+}
+
+bool UInitialize(int argc, char* argv[], GLFWwindow** window) {
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+
+	*window = glfwCreateWindow(windowWidth, windowHeight, windowTitle, NULL, NULL);
+
+	if (*window == NULL) {
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return false;
+	}
+
+	glfwMakeContextCurrent(*window);
+	glfwSetFramebufferSizeCallback(*window, UResizeWindow);
+	glfwSetCursorPosCallback(*window, UMousePositionCallback);
+	glfwSetScrollCallback(*window, UMouseScrollCallback);
+	glfwSetMouseButtonCallback(*window, UMouseButtonCallback);
+	glfwSetInputMode(*window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	glewExperimental = GL_TRUE;
+	GLenum GlewInitResult = glewInit();
+
+	if (GLEW_OK != GlewInitResult) {
+		std::cerr << glewGetErrorString(GlewInitResult) << std::endl;
+		return false;
+	}
+
+	cout << "INFO: OpenGL Version: " << glGetString(GL_VERSION) << endl;
+	return true;
+}
+
+void UProcessInput(GLFWwindow* window) {
+	static const float cameraSpeed = 2.5f;
+
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(FORWARD, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(BACKWARD, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(LEFT, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(RIGHT, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(UP, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(DOWN, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
+		gCamera.ProcessKeyboard(VIEW, gDeltaTime);
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+}
+
+void UResizeWindow(GLFWwindow* window, int width, int height) {
+	glViewport(0, 0, width, height);
+}
+
+void UMousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
+	if (gFirstMouse) {
+		gLastX = xpos;
+		gLastY = ypos;
+		gFirstMouse = false;
+	}
+
+	float xoffset = xpos - gLastX;
+	float yoffset = gLastY - ypos;
+	gLastX = xpos;
+	gLastY = ypos;
+	gCamera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void UMouseScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+	gCamera.MovementSpeed += static_cast<float>(yoffset);
+
+	if (gCamera.MovementSpeed < 0.0f) {
+		gCamera.MovementSpeed = 0.0f;
+	}
+	else if (gCamera.MovementSpeed > 5.0f) {
+		gCamera.MovementSpeed = 5.0f;
+	}
+}
+
+void UMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+	switch (button) {
+	case GLFW_MOUSE_BUTTON_LEFT: {
+		if (action == GLFW_PRESS)
+			cout << "Left mouse button pressed" << endl;
+		else
+			cout << "Left mouse button released" << endl;
+	}
+								 break;
+
+	case GLFW_MOUSE_BUTTON_MIDDLE: {
+		if (action == GLFW_PRESS)
+			cout << "Middle mouse button pressed" << endl;
+		else
+			cout << "Middle mouse button released" << endl;
+	}
+								   break;
+
+	case GLFW_MOUSE_BUTTON_RIGHT: {
+		if (action == GLFW_PRESS)
+			cout << "Right mouse button pressed" << endl;
+		else
+			cout << "Right mouse button released" << endl;
+	}
+								  break;
+
+	default:
+		cout << "Unhandled mouse button event" << endl;
+		break;
+	}
+}
+
+void URender() {
+	glEnable(GL_DEPTH_TEST);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glm::mat4 scale = glm::scale(glm::vec3(2.0f, 2.0f, 2.0f));
+	glm::mat4 rotation = glm::rotate(0.5f, glm::vec3(1.0, 1.0f, 1.0f));
+	glm::mat4 translation = glm::translate(glm::vec3(0.0f, 0.0f, 0.0f));
+	glm::mat4 model = translation * rotation * scale;
+	glm::mat4 view = gCamera.GetViewMatrix();
+	glm::mat4 projection = glm::perspective(glm::radians(gCamera.Zoom), (GLfloat)windowWidth / (GLfloat)windowHeight, 0.1f, 100.0f);
+	
+	glUseProgram(gProgramId);
+
+	GLint modelLoc = glGetUniformLocation(gProgramId, "model");
+	GLint viewLoc = glGetUniformLocation(gProgramId, "view");
+	GLint projLoc = glGetUniformLocation(gProgramId, "projection");
+
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	
+	glBindVertexArray(gMesh.vao);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gTextureId);
+
+	glDrawElements(GL_TRIANGLES, gMesh.nVertices, GL_UNSIGNED_SHORT, NULL);
+	glBindVertexArray(0);
+	glfwSwapBuffers(gWindow);
+}
+
+void UCreateMesh(GLMesh &mesh) {
+	GLfloat vertices[] = {
+
+		// Base
+		-0.5f, -0.5f, -0.5f,	0.0f, 0.0f,     // front left
+		0.5f, -0.5f, -0.5f,		1.0f, 0.0f,     // front right
+		0.5f, -0.5f, 0.5f,		1.0f, 1.0f,     // back right
+		-0.5f, -0.5f, 0.5f,		0.0f, 1.0f,     // back left
+
+		
+		// Pyramid
+		0.0f, 0.5f, 0.0f,		0.5f, 1.0f,     // top
+		-0.5f, -0.5f, -0.5f,	0.0f, 0.0f,     // front left
+		0.5f, -0.5f, -0.5f,		1.0f, 0.0f,     // front right
+
+		0.0f, 0.5f, 0.0f,		0.5f, 1.0f,     // top
+		0.5f, -0.5f, -0.5f,		1.0f, 0.0f,     // front right
+		0.5f, -0.5f, 0.5f,		1.0f, 1.0f,     // back right
+
+		0.0f, 0.5f, 0.0f,		0.5f, 1.0f,     // top
+		0.5f, -0.5f, 0.5f,		1.0f, 1.0f,     // back right
+		-0.5f, -0.5f, 0.5f,		0.0f, 1.0f,     // back left
+
+		0.0f, 0.5f, 0.0f,		0.5f, 1.0f,     // top
+		-0.5f, -0.5f, 0.5f,		0.0f, 1.0f,     // back left
+		-0.5f, -0.5f, -0.5f,	0.0f, 0.0f      // front left
+
+	};
+
+	const GLuint floatsPerVertex = 3;
+	const GLuint floatsPerUV = 2;
+
+	mesh.nVertices = sizeof(vertices) / (sizeof(vertices[0]) * (floatsPerVertex + floatsPerUV));
+
+	glGenVertexArrays(1, &mesh.vao);
+	glBindVertexArray(mesh.vao);
+
+	glGenBuffers(1, &mesh.vbos);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbos);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	
+	GLint stride = sizeof(float) * (floatsPerVertex + floatsPerUV);
+
+	glVertexAttribPointer(0, floatsPerVertex, GL_FLOAT, GL_FALSE, stride, 0);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(2, floatsPerUV, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * floatsPerVertex));
+	glEnableVertexAttribArray(2);
+}
+
+
+void UDestroyMesh(GLMesh &mesh) {
+	glDeleteVertexArrays(1, &mesh.vao);
+	glDeleteBuffers(1, &mesh.vbos);
+}
+
+
+//TODO
+/*Generate and load the texture*/
+bool UCreateTexture(const char* filename, GLuint &textureId) {
+	int width, height, channels;
+	unsigned char *image = stbi_load(filename, &width, &height, &channels, 0);
+
+	if (image) {
+		flipImageVertically(image, width, height, channels);
+
+		glGenTextures(1, &textureId);
+		glBindTexture(GL_TEXTURE_2D, textureId);
+
+		// set the texture wrapping parameters
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		// set texture filtering parameters
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		if (channels == 3)
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+		else if (channels == 4)
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+		else {
+			cout << "Not implemented to handle image with " << channels << " channels" << endl;
+			return false;
+		}
+
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		stbi_image_free(image);
+		glBindTexture(GL_TEXTURE_2D, 0); // Unbind the texture
+
+		return true;
+	}
+
+	// Error loading the image
+	return false;
+}
+
+void UDestroyTexture (GLuint textureId) {
+	glDeleteTextures(1, &textureId);
+}
+
+bool UCreateShaderProgram(const char* vtxShaderSource, const char* fragShaderSource, GLuint &programId) {
+	int success = 0;
+	char infoLog[512];
+
+	programId = glCreateProgram();
+	
+	GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
+	GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
+	
+	glShaderSource(vertexShaderId, 1, &vtxShaderSource, NULL);
+	glShaderSource(fragmentShaderId, 1, &fragShaderSource, NULL);
+	
+	glCompileShader(vertexShaderId);
+
+	glGetShaderiv(vertexShaderId, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(vertexShaderId, 512, NULL, infoLog);
+		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+		return false;
+	}
+
+	glCompileShader(fragmentShaderId);
+
+	glGetShaderiv(fragmentShaderId, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(fragmentShaderId, sizeof(infoLog), NULL, infoLog);
+		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+		return false;
+	}
+
+	glAttachShader(programId, vertexShaderId);
+	glAttachShader(programId, fragmentShaderId);
+	glLinkProgram(programId);
+
+	glGetProgramiv(programId, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(programId, sizeof(infoLog), NULL, infoLog);
+		std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+		return false;
+	}
+
+	glUseProgram(programId);
+	return true;
+}
+
+void UDestroyShaderProgram(GLuint programId) {
+	glDeleteProgram(programId);
+}

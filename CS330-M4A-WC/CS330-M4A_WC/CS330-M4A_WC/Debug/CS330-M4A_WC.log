@@ -1,0 +1,10 @@
+﻿  Source.cpp
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(85): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(159): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(160): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(164): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(165): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(166): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(167): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m4a-wc\cs330-m4a_wc\cs330-m4a_wc\source.cpp(172): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+  CS330-M4A_WC.vcxproj -> C:\Users\user1\Desktop\CS330\CS330-M4A-WC\CS330-M4A_WC\Debug\CS330-M4A_WC.exe

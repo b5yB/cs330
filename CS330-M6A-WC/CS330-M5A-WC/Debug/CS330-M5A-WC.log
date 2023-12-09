@@ -1,0 +1,11 @@
+﻿  Source.cpp
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(260): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(372): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(373): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(377): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(378): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(380): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(381): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m6a-wc\cs330-m5a-wc\source.cpp(391): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  CS330-M5A-WC.vcxproj -> C:\Users\user1\Desktop\CS330\CS330-M6A-WC\Debug\CS330-M5A-WC.exe
