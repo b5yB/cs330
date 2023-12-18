@@ -1,0 +1,9 @@
+﻿  Source.cpp
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(275): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(382): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(383): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(387): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(388): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(390): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\user1\desktop\cs330\cs330-m7p-wc\cs330-m7p-wc\source.cpp(391): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+  CS330-M7P-WC.vcxproj -> C:\Users\user1\Desktop\CS330\CS330-M7P-WC\Debug\CS330-M7P-WC.exe
